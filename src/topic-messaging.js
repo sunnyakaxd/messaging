@@ -1,8 +1,9 @@
 'use strict';
 
-const messaging = require('./mqtt-messaging');
-const LinkedList = require('../../utils/doubly-linked-list');
 const uuid = require('uuid');
+const messaging = require('./mqtt-messaging');
+const LinkedList = require('../utils/doubly-linked-list');
+
 
 let exportsWrapper = {
 };
@@ -14,12 +15,18 @@ ignoreSet.transientAdd = function transientAdd(data) {
   return data;
 };
 
+
 function init(config, initCb) {
   if (typeof config === 'function') {
     initCb = config;
     config = null;
   }
   config = config || {};
+  function debug(...rest) {
+    if (config.debug) {
+      console.log(...rest);// eslint-disable-line no-console
+    }
+  }
   let subscribers = {};
   messaging.init(config, () => {
     messaging.subscribe('topicMessaging', (wrappedMsg) => {
@@ -27,7 +34,7 @@ function init(config, initCb) {
         wrappedMsg = JSON.parse(wrappedMsg);
         if (wrappedMsg.ignoreMe) {
           if (ignoreSet.has(wrappedMsg.ignoreMe)) {
-            console.log(`Ignoring message: ${wrappedMsg.topic}:${wrappedMsg.msg}`);
+            debug(`Ignoring message: ${wrappedMsg.topic}:${wrappedMsg.msg}`);
             return;
           }
         }
