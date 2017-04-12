@@ -1,0 +1,5 @@
+FROM node:alpine
+RUN mkdir -p /swarm
+WORKDIR /swarm
+COPY . /swarm
+CMD node /swarm/er/messaging/test/swarm/swarm-messaging/swarm-publisher.js

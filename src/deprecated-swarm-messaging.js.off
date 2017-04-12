@@ -1,0 +1,93 @@
+'use strict';
+const http = require('http');
+const messaging = require('./udp-messaging');
+
+const exportsWrapper = {
+};
+const query = encodeURIComponent(`${JSON.stringify({
+  $each: {
+    NetworkSettings: {
+      Networks: {
+        $each: {
+          IPAddress: true,
+        },
+      },
+    },
+  },
+})}`);
+
+function update(communicator, cb) {
+  http.request({
+    host: communicator,
+    port: 3000,
+    path: `/comSvcName/inspect/${exportsWrapper.serviceName}/containers${query ? (`?filter=${query}`) : ''}`,
+  }, (res) => {
+    const infoWrapper = [];
+    res.on('data', (chunk) => {
+      infoWrapper.push(chunk);
+    });
+    res.on('end', () => {
+      const meta = JSON.parse(decodeURIComponent(infoWrapper.join()));
+      console.log('recieved Meta', JSON.stringify(meta, null, 2));
+      try {
+        if (meta.error) {
+          if (cb) {
+            cb(meta.error);
+          }
+          console.log('Invalid Response: ', meta.error);
+          console.log('Failed to get ip lists, will retry in 10 seconds');
+          return;
+        }
+        const myNetworks = Object.keys(meta[0].NetworkSettings.Networks);
+        const ipList = meta.map(container => myNetworks
+                  .map(network => container.NetworkSettings.Networks[network].IPAddress)
+                  .reduce((net1, net2) => net1.concat(net2)));
+        console.log('ipList:', ipList);
+        if (cb) {
+          cb(null, ipList);
+        }
+      } catch (e) {
+        if (cb) {
+          cb(e);
+        }
+        console.log('Valid Response, but processing failed ', e);
+        console.log('Failed to get ip lists, will retry in 10 seconds');
+      }
+    });
+  }).end();
+}
+
+function init(config, initCb) {
+  config = config || {};
+  exportsWrapper.serviceName = config.serviceName || process.env.SERVICE_NAME || 'swarm-subscriber';
+  update(process.env.SWARM_MANAGER_IP, (err, ipList) => {
+    console.log('initialising ip list ', ipList);
+    config.ipList = ipList;
+    messaging.init(config, () => {
+      exportsWrapper.updater = setInterval(() => {
+        update(process.env.SWARM_MANAGER_IP, (err1, newIpList) => {
+          if (err1) {
+            console.log('Failed to get ip lists, will retry in 10 seconds');
+            return;
+          }
+          messaging.update(newIpList);
+          console.log('updating ip list ', newIpList);
+        });
+      }, 10000);
+      if (initCb) {
+        initCb();
+      }
+    });
+  });
+}
+
+module.exports = {
+  init,
+  update,
+  subscribe: messaging.subscribe.bind(messaging),
+  publish: messaging.publish.bind(messaging),
+  destroy: (destroyCb) => {
+    clearInterval(exportsWrapper.updater);
+    messaging.destroy(destroyCb);
+  },
+};
