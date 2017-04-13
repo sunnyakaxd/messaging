@@ -27,6 +27,7 @@ function init(config, initCb) {
       console.log(...rest);// eslint-disable-line no-console
     }
   }
+  debug(`Initialising topic messaging with ${JSON.stringify(config, null, 2)}`);
   let subscribers = {};
   messaging.init(config, () => {
     messaging.subscribe('topicMessaging', (wrappedMsg) => {
