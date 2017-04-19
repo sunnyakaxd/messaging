@@ -17,10 +17,6 @@ module.exports = {
   },
   subscribe(...rest) {
     console.log('Subscribing');
-    const cb = rest[rest.length - 1];
-    if (cb && typeof cb === 'function') {
-      cb();
-    }
   },
   destroy(...rest) {
     console.log('Subscribing');
